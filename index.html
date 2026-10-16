@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Family Tree</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; }
+    body {
+      background: #f4f8fb;
+      margin: 0;
+      padding: 15px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { color: #1b4f72; margin: 0 0 15px 0; font-size: 26px; }
+
+    .main-layout {
+      display: flex;
+      gap: 20px;
+      max-width: 1200px;
+      width: 100%;
+      align-items: flex-start;
+    }
+
+    /* Left Controls Panel */
+    .controls-panel {
+      flex: 0 0 280px;
+      background: #ffffff;
+      padding: 16px 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      border: 1px solid #dcdde1;
+    }
+    .controls-panel h2 {
+      margin: 0 0 4px 0;
+      font-size: 17px;
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 5px;
+    }
+    .hint-text {
+      font-size: 12px;
+      color: #7f8c8d;
+      margin: 0 0 10px 0;
+    }
+    .input-row { margin-bottom: 8px; }
+    .input-row:last-child { margin-bottom: 0; }
+    .input-row label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      color: #2f3640;
+      margin-bottom: 2px;
+    }
+    .input-row input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1.5px solid #bdc3c7;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .gender-select {
+      display: flex;
+      gap: 12px;
+      margin-top: 4px;
+      font-size: 13px;
+    }
+    .gender-select label {
+      font-weight: normal;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+    }
+
+    /* The Illustrated Tree Display */
+    .tree-stage {
+      flex: 1;
+      background: #ffffff;
+      padding: 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      border: 1px solid #dcdde1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Green Tree Canopy */
+    .tree-canvas {
+      position: relative;
+      width: 100%;
+      max-width: 740px;
+      height: 440px;
+      background: radial-gradient(circle at 50% 45%, #6ab04c 0%, #449232 55%, #2e6d20 90%);
+      border-radius: 140px 140px 100px 100px;
+      border: 7px solid #3c822b;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 22px 20px 12px 20px;
+      margin-bottom: 45px;
+    }
+
+    /* Kinship SVG Lines Overlay */
+    .kinship-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .kin-line {
+      stroke: #f1c40f;
+      stroke-width: 4px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+    }
+
+    /* Tree Trunk */
+    .tree-trunk {
+      position: absolute;
+      bottom: -45px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 65px;
+      height: 50px;
+      background: #7d4d23;
+      border-radius: 4px 4px 12px 12px;
+      z-index: 0;
+    }
+    .tree-trunk::after {
+      content: "";
+      position: absolute;
+      bottom: -8px;
+      left: -45px;
+      width: 155px;
+      height: 14px;
+      background: #27ae60;
+      border-radius: 15px;
+    }
+
+    /* Tree Levels (Branches) */
+    .tree-tier {
+      display: flex;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+    }
+    .tier-grandparents { gap: 110px; }
+    .tier-parents { gap: 130px; }
+    .tier-children { gap: 40px; }
+
+    /* Family Cards */
+    .family-card {
+      background: #ffffff;
+      border: 3px solid #f39c12;
+      border-radius: 10px;
+      padding: 5px 10px;
+      min-width: 120px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      transition: transform 0.15s, opacity 0.2s;
+    }
+    .family-card:hover { transform: scale(1.04); }
+    .family-card.active {
+      border-color: #e74c3c !important;
+      background: #fff8e7 !important;
+      box-shadow: 0 0 12px rgba(231,76,60,0.8);
+    }
+    .family-card.male { border-color: #2980b9; }
+    .family-card.female { border-color: #d81b60; }
+    .family-card.me { border-color: #8e44ad; background: #faf5fc; }
+
+    /* Hidden state preserves layout spacing so SVG lines stay aligned */
+    .family-card.hidden-member {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .card-icon { font-size: 22px; line-height: 1; margin-bottom: 2px; }
+    .card-role {
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #7f8c8d;
+    }
+    .family-card.male .card-role { color: #2980b9; }
+    .family-card.female .card-role { color: #c2185b; }
+    .family-card.me .card-role { color: #8e44ad; }
+
+    .card-name {
+      font-size: 16px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin-top: 1px;
+    }
+
+    /* Speaking Box */
+    .speech-box {
+      width: 100%;
+      background: #fffde7;
+      border: 2px solid #fbc02d;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 10px;
+      text-align: center;
+    }
+    .sentence-output {
+      font-size: 24px;
+      color: #1a252f;
+      margin: 4px 0 10px 0;
+      font-weight: 600;
+    }
+    
+    /* Lexical & Pronoun Badges */
+    .hl-vocab {
+      color: #0e6251;
+      background: #d4efdf;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1.5px solid #a9dfbf;
+      font-weight: bold;
+    }
+    .hl-male {
+      color: #0066cc;
+      font-weight: bold;
+      background: #e3f2fd;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1.5px solid #bbdefb;
+    }
+    .hl-female {
+      color: #c2185b;
+      font-weight: bold;
+      background: #fce4ec;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1.5px solid #f8bbd0;
+    }
+    .hl-me {
+      color: #6c3483;
+      font-weight: bold;
+      background: #f4ecf7;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1.5px solid #d2b4de;
+    }
+    
+    .rule-formula {
+      font-size: 15px;
+      font-weight: bold;
+      color: #555;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🌳 Family Tree</h1>
+
+  <div class="main-layout">
+    <!-- Left Controls Panel -->
+    <div class="controls-panel">
+      <h2>Names</h2>
+      <p class="hint-text">Leave a field blank to hide that member.</p>
+      
+      <!-- Student (Me) -->
+      <div class="input-row" style="background: #f4ecf7; padding: 6px 8px; border-radius: 6px; border: 1px dashed #8e44ad;">
+        <label style="color: #8e44ad;">Me (Student):</label>
+        <input type="text" id="inME" value="?" placeholder="?" oninput="applyTreeNames()">
+        <div class="gender-select">
+          <label><input type="radio" name="studentGender" value="male" checked onchange="applyTreeNames()"> 👦 He</label>
+          <label><input type="radio" name="studentGender" value="female" onchange="applyTreeNames()"> 👧 She</label>
+        </div>
+      </div>
+
+      <div class="input-row" style="margin-top: 8px;">
+        <label>Grandfather 👴:</label>
+        <input type="text" id="inGF" value="?" placeholder="?" oninput="applyTreeNames()">
+      </div>
+      <div class="input-row">
+        <label>Grandmother 👵:</label>
+        <input type="text" id="inGM" value="?" placeholder="?" oninput="applyTreeNames()">
+      </div>
+      <div class="input-row">
+        <label>Father 👨:</label>
+        <input type="text" id="inFA" value="?" placeholder="?" oninput="applyTreeNames()">
+      </div>
+      <div class="input-row">
+        <label>Mother 👩:</label>
+        <input type="text" id="inMO" value="?" placeholder="?" oninput="applyTreeNames()">
+      </div>
+      <div class="input-row">
+        <label>Brother 👦:</label>
+        <input type="text" id="inBRO" value="?" placeholder="?" oninput="applyTreeNames()">
+      </div>
+      <div class="input-row">
+        <label>Sister 👧:</label>
+        <input type="text" id="inSIS" value="?" placeholder="?" oninput="applyTreeNames()">
+      </div>
+    </div>
+
+    <!-- Tree Canvas -->
+    <div class="tree-stage">
+      <div class="tree-canvas">
+        
+        <!-- Kinship SVG Connector Lines -->
+        <svg class="kinship-svg" viewBox="0 0 740 440" preserveAspectRatio="none">
+          <!-- Grandparents marriage bar + descent line to Father -->
+          <path id="lineGPBar" class="kin-line" d="M 290 55 H 450" />
+          <path id="lineGPToFA" class="kin-line" d="M 370 55 V 150 H 280 V 170" />
+
+          <!-- Parents marriage bar + descent stem -->
+          <path id="linePBar" class="kin-line" d="M 315 210 H 425" />
+          <path id="linePStem" class="kin-line" d="M 370 210 V 290" />
+
+          <!-- Horizontal fork over the Children -->
+          <path id="lineChildrenBar" class="kin-line" d="M 215 290 H 525" />
+
+          <!-- Vertical drops to Brother, Me, Sister -->
+          <path id="lineDropBRO" class="kin-line" d="M 215 290 V 330" />
+          <path id="lineDropME" class="kin-line" d="M 370 290 V 330" />
+          <path id="lineDropSIS" class="kin-line" d="M 525 290 V 330" />
+        </svg>
+
+        <!-- Tier 1: Grandparents -->
+        <div class="tree-tier tier-grandparents">
+          <div class="family-card male" id="cardGF" onclick="selectMember('grandfather', 'male')">
+            <div class="card-icon">👴</div>
+            <div class="card-role">Grandfather</div>
+            <div class="card-name" id="nameGF">?</div>
+          </div>
+          <div class="family-card female" id="cardGM" onclick="selectMember('grandmother', 'female')">
+            <div class="card-icon">👵</div>
+            <div class="card-role">Grandmother</div>
+            <div class="card-name" id="nameGM">?</div>
+          </div>
+        </div>
+
+        <!-- Tier 2: Parents -->
+        <div class="tree-tier tier-parents">
+          <div class="family-card male active" id="cardFA" onclick="selectMember('father', 'male')">
+            <div class="card-icon">👨</div>
+            <div class="card-role">Father</div>
+            <div class="card-name" id="nameFA">?</div>
+          </div>
+          <div class="family-card female" id="cardMO" onclick="selectMember('mother', 'female')">
+            <div class="card-icon">👩</div>
+            <div class="card-role">Mother</div>
+            <div class="card-name" id="nameMO">?</div>
+          </div>
+        </div>
+
+        <!-- Tier 3: Children / Me -->
+        <div class="tree-tier tier-children">
+          <div class="family-card male" id="cardBRO" onclick="selectMember('brother', 'male')">
+            <div class="card-icon">👦</div>
+            <div class="card-role">Brother</div>
+            <div class="card-name" id="nameBRO">?</div>
+          </div>
+
+          <div class="family-card me" id="cardME" onclick="selectMember('me', getStudentGender())">
+            <div class="card-icon" id="iconME">👦</div>
+            <div class="card-role">ME</div>
+            <div class="card-name" id="nameME">?</div>
+          </div>
+
+          <div class="family-card female" id="cardSIS" onclick="selectMember('sister', 'female')">
+            <div class="card-icon">👧</div>
+            <div class="card-role">Sister</div>
+            <div class="card-name" id="nameSIS">?</div>
+          </div>
+        </div>
+
+        <!-- Tree Trunk -->
+        <div class="tree-trunk"></div>
+      </div>
+
+      <!-- Live Clean Sentence Box -->
+      <div class="speech-box">
+        <div class="sentence-output" id="outputSentence">
+          "This is my <span class="hl-vocab">father</span>. <span class="hl-male">His</span> name is <b>?</b>."
+        </div>
+        <div class="rule-formula" id="formulaBox">
+          <span>🟩 <span class="hl-vocab">Family</span></span>
+          <span>👨 Man = <span class="hl-male">HIS</span></span>
+          <span>👩 Woman = <span class="hl-female">HER</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentRole = 'father';
+    let currentGender = 'male';
+
+    const membersConfig = [
+      { role: 'me',          inputId: 'inME',  nameId: 'nameME',  cardId: 'cardME',  getGender: () => getStudentGender() },
+      { role: 'grandfather', inputId: 'inGF',  nameId: 'nameGF',  cardId: 'cardGF',  getGender: () => 'male' },
+      { role: 'grandmother', inputId: 'inGM',  nameId: 'nameGM',  cardId: 'cardGM',  getGender: () => 'female' },
+      { role: 'father',      inputId: 'inFA',  nameId: 'nameFA',  cardId: 'cardFA',  getGender: () => 'male' },
+      { role: 'mother',      inputId: 'inMO',  nameId: 'nameMO',  cardId: 'cardMO',  getGender: () => 'female' },
+      { role: 'brother',     inputId: 'inBRO', nameId: 'nameBRO', cardId: 'cardBRO', getGender: () => 'male' },
+      { role: 'sister',      inputId: 'inSIS', nameId: 'nameSIS', cardId: 'cardSIS', getGender: () => 'female' }
+    ];
+
+    function getStudentGender() {
+      const radios = document.getElementsByName('studentGender');
+      for (const r of radios) {
+        if (r.checked) return r.value;
+      }
+      return 'male';
+    }
+
+    function applyTreeNames() {
+      const studentGender = getStudentGender();
+      document.getElementById('iconME').innerText = (studentGender === 'female') ? '👧' : '👦';
+
+      const visibleMap = {};
+
+      // Show or hide each family card based on whether the input is blank
+      membersConfig.forEach(m => {
+        const val = document.getElementById(m.inputId).value.trim();
+        const card = document.getElementById(m.cardId);
+        const nameEl = document.getElementById(m.nameId);
+
+        if (val === '') {
+          card.classList.add('hidden-member');
+          card.classList.remove('active');
+          visibleMap[m.role] = false;
+        } else {
+          card.classList.remove('hidden-member');
+          nameEl.innerText = val;
+          visibleMap[m.role] = true;
+        }
+      });
+
+      // Update SVG connector lines to match visible cards
+      updateConnectorLines(visibleMap);
+
+      // Keep current selection if still visible; otherwise pick the first visible member
+      if (visibleMap[currentRole]) {
+        selectMember(currentRole, (currentRole === 'me' ? studentGender : currentGender));
+      } else {
+        const firstVisible = membersConfig.find(m => visibleMap[m.role]);
+        if (firstVisible) {
+          selectMember(firstVisible.role, firstVisible.getGender());
+        } else {
+          document.getElementById('outputSentence').innerHTML = `"Add a family member's name to begin!"`;
+        }
+      }
+    }
+
+    function setLine(id, show, d = null) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.display = show ? '' : 'none';
+      if (d) el.setAttribute('d', d);
+    }
+
+    function updateConnectorLines(v) {
+      // 1. Grandparents -> Father lines
+      const bothGP = v.grandfather && v.grandmother;
+      const anyGP = v.grandfather || v.grandmother;
+
+      if (bothGP) {
+        setLine('lineGPBar', true, 'M 290 55 H 450');
+      } else if (v.grandfather && v.father) {
+        setLine('lineGPBar', true, 'M 290 55 H 370');
+      } else if (v.grandmother && v.father) {
+        setLine('lineGPBar', true, 'M 370 55 H 450');
+      } else {
+        setLine('lineGPBar', false);
+      }
+
+      setLine('lineGPToFA', anyGP && v.father);
+
+      // 2. Parents -> Children lines
+      const bothP = v.father && v.mother;
+      const anyP = v.father || v.mother;
+      const anyChild = v.brother || v.me || v.sister;
+
+      if (bothP) {
+        setLine('linePBar', true, 'M 315 210 H 425');
+      } else if (v.father && anyChild) {
+        setLine('linePBar', true, 'M 315 210 H 370');
+      } else if (v.mother && anyChild) {
+        setLine('linePBar', true, 'M 370 210 H 425');
+      } else {
+        setLine('linePBar', false);
+      }
+
+      setLine('linePStem', anyP && anyChild);
+
+      // 3. Children horizontal fork and vertical drops
+      const childX = [];
+      if (v.brother) childX.push(215);
+      if (v.me)      childX.push(370);
+      if (v.sister)  childX.push(525);
+
+      const showTreeLinks = anyP || childX.length > 1;
+
+      setLine('lineDropBRO', v.brother && showTreeLinks);
+      setLine('lineDropME',  v.me && showTreeLinks);
+      setLine('lineDropSIS', v.sister && showTreeLinks);
+
+      if (childX.length === 0 || !showTreeLinks) {
+        setLine('lineChildrenBar', false);
+      } else {
+        let minX = Math.min(...childX);
+        let maxX = Math.max(...childX);
+        // Ensure the horizontal bar reaches the parent stem at X=370 if a parent is visible
+        if (anyP) {
+          minX = Math.min(minX, 370);
+          maxX = Math.max(maxX, 370);
+        }
+        if (minX === maxX) {
+          setLine('lineChildrenBar', false);
+        } else {
+          setLine('lineChildrenBar', true, `M ${minX} 290 H ${maxX}`);
+        }
+      }
+    }
+
+    function selectMember(role, gender) {
+      const memberObj = membersConfig.find(m => m.role === role);
+      if (memberObj && document.getElementById(memberObj.cardId).classList.contains('hidden-member')) {
+        return; // Prevent selecting a hidden member
+      }
+
+      currentRole = role;
+      currentGender = gender;
+
+      document.querySelectorAll('.family-card').forEach(c => c.classList.remove('active'));
+
+      let name = '';
+      let pronoun = '';
+      let hlClass = '';
+
+      if (role === 'me') {
+        document.getElementById('cardME').classList.add('active');
+        name = document.getElementById('nameME').innerText;
+        document.getElementById('outputSentence').innerHTML = 
+          `"Hello! <span class="hl-me">My</span> name is <b>${name}</b>."`;
+        document.getElementById('formulaBox').innerHTML = 
+          `<span>👤 Me = <span class="hl-me">MY</span></span>
+           <span>👨 Man = <span class="hl-male">HIS</span></span>
+           <span>👩 Woman = <span class="hl-female">HER</span></span>`;
+        return;
+      }
+
+      // Reset formula box when viewing other family members
+      document.getElementById('formulaBox').innerHTML = 
+        `<span>🟩 <span class="hl-vocab">Family</span></span>
+         <span>👨 Man = <span class="hl-male">HIS</span></span>
+         <span>👩 Woman = <span class="hl-female">HER</span></span>`;
+
+      if (role === 'grandfather') {
+        document.getElementById('cardGF').classList.add('active');
+        name = document.getElementById('nameGF').innerText;
+        pronoun = 'His';
+        hlClass = 'hl-male';
+      } else if (role === 'grandmother') {
+        document.getElementById('cardGM').classList.add('active');
+        name = document.getElementById('nameGM').innerText;
+        pronoun = 'Her';
+        hlClass = 'hl-female';
+      } else if (role === 'father') {
+        document.getElementById('cardFA').classList.add('active');
+        name = document.getElementById('nameFA').innerText;
+        pronoun = 'His';
+        hlClass = 'hl-male';
+      } else if (role === 'mother') {
+        document.getElementById('cardMO').classList.add('active');
+        name = document.getElementById('nameMO').innerText;
+        pronoun = 'Her';
+        hlClass = 'hl-female';
+      } else if (role === 'brother') {
+        document.getElementById('cardBRO').classList.add('active');
+        name = document.getElementById('nameBRO').innerText;
+        pronoun = 'His';
+        hlClass = 'hl-male';
+      } else if (role === 'sister') {
+        document.getElementById('cardSIS').classList.add('active');
+        name = document.getElementById('nameSIS').innerText;
+        pronoun = 'Her';
+        hlClass = 'hl-female';
+      }
+
+      document.getElementById('outputSentence').innerHTML = 
+        `"This is my <span class="hl-vocab">${role}</span>. <span class="${hlClass}">${pronoun}</span> name is <b>${name}</b>."`;
+    }
+  </script>
+</body>
+</html>
+
